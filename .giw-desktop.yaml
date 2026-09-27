@@ -1,0 +1,37 @@
+version: 1
+
+# Desktop/self-hosted execution is intentionally single-machine and single-tenant.
+# The daemon is the only lifecycle writer; UI/CLI clients request reconciliation.
+services:
+  - name: build-server
+    command: dd-build-server
+    args: []
+    autostart: false
+    env_passthrough:
+      - SERVER_AUTH_SECRET
+      - BUILD_SERVER_ALLOWED_REPO_PREFIXES
+      - BUILD_SERVER_ALLOWED_PROFILE_REPO_PREFIXES
+      - BUILD_SERVER_WORK_ROOT
+      - BUILD_SERVER_GIT_TOKEN
+      - GH_PAT
+      - DATABASE_URL
+      - NATS_URL
+      - FIDUCIA_API_KEY
+    env:
+      BUILD_SERVER_DEPLOY_ENABLED: "false"
+      BUILD_SERVER_PUSH_ENABLED: "false"
+      BUILD_SERVER_COORDINATION_REQUIRED: "false"
+
+# The tunnel uses cloudflared's existing local credential store. No Cloudflare
+# token or credential path belongs in this manifest.
+tunnel:
+  name: indiebuild-desktop
+  hostname: device.indiebuild.dev
+  service_url: http://127.0.0.1:8080
+  autostart: false
+
+# Update plans are local/operator-owned argv, never supplied by remote API clients.
+# Uncomment only after pinning the exact package/update command for the workstation.
+# update:
+#   command: zed-pkg
+#   args: ["update", "gha-indie-worker"]
