@@ -1,0 +1,27 @@
+schema_version = 1
+
+[daemon]
+listen_addr = "127.0.0.1:8770"
+token_file = "~/.indiebuild/daemon/token"
+
+[execution]
+backend = "scintilla_desktop_daemon"
+scintilla_url = "http://127.0.0.1:8750"
+scintilla_token_file = "~/.scintilla/daemon/token"
+
+[cloudflare]
+enabled = false
+command = "cloudflared"
+hostname = ""
+
+[power]
+keep_awake = false
+
+[runner]
+workspace_root = "~/.indiebuild/workspaces"
+max_parallel_jobs = 4
+
+# GIW owns workflow/job intent and GitHub-compatible execution semantics.
+# It does not duplicate Scintilla worker lifecycle/isolation. Local jobs are
+# submitted to the Scintilla desktop daemon, which remains the worker runtime
+# and machine-level process owner for those workloads.
