@@ -57,7 +57,11 @@ fn validate_manifest(value: &Value) -> Result<()> {
         .as_object()
         .context("desktop manifest root must be an object")?;
 
-    reject_unknown_keys(root, &["version", "services", "tunnel", "update"], "manifest")?;
+    reject_unknown_keys(
+        root,
+        &["version", "services", "tunnel", "update"],
+        "manifest",
+    )?;
 
     if root.get("version").and_then(Value::as_u64) != Some(1) {
         bail!("desktop manifest version must be exactly 1");
@@ -253,7 +257,8 @@ fn is_service_name(value: &str) -> bool {
     if !first.is_ascii_lowercase() && !first.is_ascii_digit() {
         return false;
     }
-    return chars.all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || matches!(ch, '.' | '_' | '-'));
+    return chars
+        .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || matches!(ch, '.' | '_' | '-'));
 }
 
 fn is_env_name(value: &str) -> bool {
