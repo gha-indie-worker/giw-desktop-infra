@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://indiebuild.dev/schemas/giw-desktop.schema.json",
+  "title": "GIW desktop desired state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "services"],
+  "properties": {
+    "version": { "const": 1 },
+    "services": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/service" }
+    },
+    "tunnel": { "$ref": "#/$defs/tunnel" },
+    "update": { "$ref": "#/$defs/update" }
+  },
+  "$defs": {
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "command"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "command": { "type": "string", "minLength": 1 },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "working_dir": { "type": "string", "minLength": 1 },
+        "env_passthrough": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" },
+          "default": []
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "default": {}
+        },
+        "autostart": { "type": "boolean", "default": false }
+      }
+    },
+    "tunnel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "service_url"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "hostname": { "type": "string", "minLength": 1 },
+        "service_url": {
+          "type": "string",
+          "pattern": "^http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(:[0-9]{1,5})?(/.*)?$"
+        },
+        "autostart": { "type": "boolean", "default": false }
+      }
+    },
+    "update": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command"],
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    }
+  }
+}
