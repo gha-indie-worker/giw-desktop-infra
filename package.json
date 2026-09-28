@@ -1,0 +1,18 @@
+{
+  "name": "@indiebuild/giw-desktop-infra-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "contracts:doctor": "tjsv doctor",
+    "contracts:inventory": "tjsv inventory --typespec=contracts/typespec/main.tsp",
+    "contracts:check": "tjsv check --typespec=contracts/typespec/main.tsp --schema=schema/giw-desktop.schema.json --instances=contracts/instances --report=artifacts/desktop-contract-parity.json --output-dir=artifacts/desktop-generated-schema-b"
+  },
+  "devDependencies": {
+    "@oresoftware/typespec-json-schema-validator": "https://github.com/ORESoftware/typespec-json-schema-validator/archive/92a7c79927930774a31a335e77f843c69316292e.tar.gz",
+    "@typespec/json-schema": "1.16.0"
+  },
+  "engines": {
+    "node": ">=22.9"
+  }
+}
