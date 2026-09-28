@@ -5,6 +5,18 @@ use std::{
     process::ExitCode,
 };
 
+const GENERATION_AUTHORITY: &str = "7634e94c2051ec473a625ac13a83f329eb66ce2c";
+const GENERATION_LIFECYCLE: [&str; 8] = [
+    "prepare",
+    "validate",
+    "compile_build_generation",
+    "stage",
+    "health_check",
+    "atomic_activate",
+    "bounded_drain",
+    "commit",
+];
+
 fn main() -> ExitCode {
     match run() {
         Ok(()) => {
@@ -83,22 +95,108 @@ fn run() -> Result<(), String> {
         }
     }
 
-    Ok(())
+    validate_generation_contract(&root)?;
+
+    return Ok(());
+}
+
+fn validate_generation_contract(root: &Path) -> Result<(), String> {
+    let contract = read_json(root.join("ores-generation-contract.json"))?;
+    require_json_str(&contract, "/schema", "ores.desktop-generation-consumer/v1")?;
+    require_json_str(
+        &contract,
+        "/consumer/repository",
+        "gha-indie-worker/giw-desktop-infra",
+    )?;
+    require_json_str(&contract, "/consumer/role", "desktop_infra")?;
+    require_json_str(
+        &contract,
+        "/authority/repository",
+        "ORESoftware/ores-common-desktop-infra",
+    )?;
+    require_json_str(&contract, "/authority/revision", GENERATION_AUTHORITY)?;
+    require_git_sha(
+        "authority.revision",
+        json_str(&contract, "/authority/revision")?,
+    )?;
+
+    let lifecycle = contract
+        .pointer("/lifecycle")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "lifecycle must be an array".to_owned())?;
+    if lifecycle.len() != GENERATION_LIFECYCLE.len() {
+        return Err("generation lifecycle length mismatch".into());
+    }
+    for (actual, expected) in lifecycle.iter().zip(GENERATION_LIFECYCLE) {
+        if actual.as_str() != Some(expected) {
+            return Err(format!(
+                "generation lifecycle mismatch: expected {expected:?}, got {actual}"
+            ));
+        }
+    }
+
+    require_json_bool(&contract, "/rollback/required_before_commit", true)?;
+    require_json_bool(&contract, "/rollback/retain_previous_generation", true)?;
+    require_json_str(
+        &contract,
+        "/request_semantics/new_requests",
+        "active_generation",
+    )?;
+    require_json_str(
+        &contract,
+        "/request_semantics/existing_requests",
+        "pinned_generation",
+    )?;
+    require_json_bool(
+        &contract,
+        "/request_semantics/generation_identity_required",
+        true,
+    )?;
+    require_json_bool(&contract, "/routing/edge_proxy_route_authority", false)?;
+    require_json_bool(
+        &contract,
+        "/middleware/beam_code_reload_requires_drain_or_otp_proof",
+        true,
+    )?;
+    require_json_bool(&contract, "/verification/shared_conformance_required", true)?;
+    require_json_bool(&contract, "/verification/product_e2e_required", true)?;
+
+    let role_requirements = contract
+        .pointer("/role_requirements")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "role_requirements must be an array".to_owned())?;
+    for required in [
+        "build_stage_activate",
+        "health_before_activate",
+        "stable_ingress_only",
+        "scintilla_backed_execution",
+        "indiebuild_job_semantics_remain_product_owned",
+    ] {
+        if !role_requirements
+            .iter()
+            .any(|value| value.as_str() == Some(required))
+        {
+            return Err(format!("missing generation role requirement: {required}"));
+        }
+    }
+
+    return Ok(());
 }
 
 fn repository_root() -> Result<PathBuf, String> {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    manifest
+    return manifest
         .parent()
         .and_then(Path::parent)
         .map(Path::to_path_buf)
-        .ok_or_else(|| "cannot resolve repository root".into())
+        .ok_or_else(|| "cannot resolve repository root".into());
 }
 
 fn read_json(path: PathBuf) -> Result<Value, String> {
     let text =
         fs::read_to_string(&path).map_err(|error| format!("read {}: {error}", path.display()))?;
-    serde_json::from_str(&text).map_err(|error| format!("parse {}: {error}", path.display()))
+    return serde_json::from_str(&text)
+        .map_err(|error| format!("parse {}: {error}", path.display()));
 }
 
 fn require_git_sha(name: &str, value: &str) -> Result<(), String> {
@@ -107,26 +205,26 @@ fn require_git_sha(name: &str, value: &str) -> Result<(), String> {
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
     if valid {
-        Ok(())
-    } else {
-        Err(format!("{name} must be a 40-character lowercase git SHA"))
+        return Ok(());
     }
+
+    return Err(format!("{name} must be a 40-character lowercase git SHA"));
 }
 
 fn json_str<'a>(value: &'a Value, pointer: &str) -> Result<&'a str, String> {
-    value
+    return value
         .pointer(pointer)
         .and_then(Value::as_str)
-        .ok_or_else(|| format!("{pointer} must be a string"))
+        .ok_or_else(|| format!("{pointer} must be a string"));
 }
 
 fn require_json_str(value: &Value, pointer: &str, expected: &str) -> Result<(), String> {
     let actual = json_str(value, pointer)?;
     if actual == expected {
-        Ok(())
-    } else {
-        Err(format!("{pointer}={actual:?}, expected {expected:?}"))
+        return Ok(());
     }
+
+    return Err(format!("{pointer}={actual:?}, expected {expected:?}"));
 }
 
 fn require_json_bool(value: &Value, pointer: &str, expected: bool) -> Result<(), String> {
@@ -135,10 +233,10 @@ fn require_json_bool(value: &Value, pointer: &str, expected: bool) -> Result<(),
         .and_then(Value::as_bool)
         .ok_or_else(|| format!("{pointer} must be boolean"))?;
     if actual == expected {
-        Ok(())
-    } else {
-        Err(format!("{pointer}={actual}, expected {expected}"))
+        return Ok(());
     }
+
+    return Err(format!("{pointer}={actual}, expected {expected}"));
 }
 
 fn toml_at<'a>(value: &'a toml::Value, path: &[&str]) -> Result<&'a toml::Value, String> {
@@ -148,7 +246,7 @@ fn toml_at<'a>(value: &'a toml::Value, path: &[&str]) -> Result<&'a toml::Value,
             .get(*part)
             .ok_or_else(|| format!("missing TOML key {}", path.join(".")))?;
     }
-    Ok(current)
+    return Ok(current);
 }
 
 fn require_toml_str(value: &toml::Value, path: &[&str], expected: &str) -> Result<(), String> {
@@ -156,13 +254,13 @@ fn require_toml_str(value: &toml::Value, path: &[&str], expected: &str) -> Resul
         .as_str()
         .ok_or_else(|| format!("{} must be a string", path.join(".")))?;
     if actual == expected {
-        Ok(())
-    } else {
-        Err(format!(
-            "{}={actual:?}, expected {expected:?}",
-            path.join(".")
-        ))
+        return Ok(());
     }
+
+    return Err(format!(
+        "{}={actual:?}, expected {expected:?}",
+        path.join(".")
+    ));
 }
 
 fn require_toml_bool(value: &toml::Value, path: &[&str], expected: bool) -> Result<(), String> {
@@ -170,8 +268,8 @@ fn require_toml_bool(value: &toml::Value, path: &[&str], expected: bool) -> Resu
         .as_bool()
         .ok_or_else(|| format!("{} must be boolean", path.join(".")))?;
     if actual == expected {
-        Ok(())
-    } else {
-        Err(format!("{}={actual}, expected {expected}", path.join(".")))
+        return Ok(());
     }
+
+    return Err(format!("{}={actual}, expected {expected}", path.join(".")));
 }
