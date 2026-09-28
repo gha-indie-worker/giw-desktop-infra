@@ -36,7 +36,33 @@ IndieBuild hosted control plane
 - GIW daemon: `127.0.0.1:8770`
 - Scintilla desktop daemon: `127.0.0.1:8765`
 
-The GIW daemon token defaults to `~/.indiebuild/daemon/token`; the Scintilla token defaults to `~/.scintilla/daemon/token`. Both are local secrets and must never be committed.
+The GIW daemon token defaults to `~/.indiebuild/daemon/token`. The GIW daemon's standalone Scintilla-token default is `~/.scintilla/daemon/token`. Both are local secrets and must never be committed.
+
+The pinned `scintilla-desktop-infra` appliance deliberately keeps its runtime state under its own desktop state directory (`<scintilla checkout>/.desktop/runtime` by default). That means its actual token is normally `<scintilla checkout>/.desktop/runtime/token`, not GIW's standalone fallback path. Do not copy the token. Point GIW at the existing protected file with `GIW_SCINTILLA_TOKEN_FILE`.
+
+## Required local startup order
+
+Scintilla is the execution substrate, so it must be healthy before GIW starts. For the normal sibling-checkout layout:
+
+```sh
+SCINTILLA_DIR="$(cd ../scintilla-desktop-infra && pwd)"
+SCINTILLA_STATE="${SCINTILLA_DESKTOP_STATE:-$SCINTILLA_DIR/.desktop}"
+
+# Bootstrap/render/start the exact Scintilla revision from appliance.json first.
+curl --fail --silent http://127.0.0.1:8765/healthz >/dev/null
+
+test -s "$SCINTILLA_STATE/runtime/token"
+export GIW_SCINTILLA_TOKEN_FILE="$SCINTILLA_STATE/runtime/token"
+
+# Only after the Scintilla health and token gates pass should GIW start.
+ores-compose check .ores-compose.yaml
+ores-compose plan .ores-compose.yaml
+ores-compose up .ores-compose.yaml
+```
+
+If the Scintilla checkout lives elsewhere, set `SCINTILLA_DESKTOP_STATE` to the state directory created by that appliance before deriving `GIW_SCINTILLA_TOKEN_FILE`.
+
+Starting `giw-desktop-daemon` directly follows the same order: the process reads the Scintilla token during startup and fails closed if the token is missing, unsafe, or unreadable.
 
 ## ORES Compose
 
@@ -48,7 +74,7 @@ ores-compose plan .ores-compose.yaml
 ores-compose up .ores-compose.yaml
 ```
 
-The Scintilla substrate is installed from the exact revision recorded in `appliance.json`. GIW's compose file deliberately does not start a second Scintilla daemon or expose either daemon publicly.
+The Scintilla substrate is installed from the exact revision recorded in `appliance.json`. GIW's compose file deliberately does not start a second Scintilla daemon or expose either daemon publicly. `GIW_SCINTILLA_TOKEN_FILE` is inherited from the caller so the product compose graph can authenticate to the already-running substrate without copying secret material into Git or argv.
 
 ## Cloudflare
 
