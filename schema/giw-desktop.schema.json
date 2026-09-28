@@ -2,111 +2,129 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://indiebuild.dev/schemas/giw-desktop.schema.json",
   "title": "GIW desktop desired state",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["version", "services"],
-  "properties": {
-    "version": { "const": 1 },
-    "services": {
-      "type": "array",
-      "maxItems": 64,
-      "items": { "$ref": "#/$defs/service" }
-    },
-    "tunnel": { "$ref": "#/$defs/tunnel" },
-    "update": { "$ref": "#/$defs/update" }
-  },
+  "$ref": "#/$defs/DesktopManifest",
   "$defs": {
-    "service": {
+    "ServiceName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "CommandText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "CommandArgument": {
+      "type": "string",
+      "maxLength": 8192
+    },
+    "Arguments": {
+      "type": "array",
+      "maxItems": 128,
+      "items": { "$ref": "#/$defs/CommandArgument" }
+    },
+    "WorkingDirectory": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "EnvName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Z_][A-Z0-9_]*$"
+    },
+    "EnvValue": {
+      "type": "string",
+      "maxLength": 16384
+    },
+    "EnvPassthrough": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/EnvName" }
+    },
+    "Environment": {
+      "type": "object",
+      "maxProperties": 128,
+      "additionalProperties": { "$ref": "#/$defs/EnvValue" }
+    },
+    "ServiceSpec": {
       "type": "object",
       "additionalProperties": false,
       "required": ["name", "command"],
       "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256,
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
-        },
-        "command": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 4096
-        },
+        "name": { "$ref": "#/$defs/ServiceName" },
+        "command": { "$ref": "#/$defs/CommandText" },
         "args": {
-          "type": "array",
-          "maxItems": 128,
-          "items": { "type": "string", "maxLength": 8192 },
+          "$ref": "#/$defs/Arguments",
           "default": []
         },
-        "working_dir": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 4096
-        },
+        "working_dir": { "$ref": "#/$defs/WorkingDirectory" },
         "env_passthrough": {
-          "type": "array",
-          "maxItems": 128,
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "maxLength": 256,
-            "pattern": "^[A-Z_][A-Z0-9_]*$"
-          },
+          "$ref": "#/$defs/EnvPassthrough",
           "default": []
         },
         "env": {
-          "type": "object",
-          "maxProperties": 128,
-          "propertyNames": {
-            "allOf": [
-              { "pattern": "^[A-Z_][A-Z0-9_]*$" },
-              {
-                "not": {
-                  "pattern": "(TOKEN|SECRET|PASSWORD|PRIVATE|CREDENTIAL|API_KEY|DATABASE_URL|GH_PAT)"
-                }
-              }
-            ]
-          },
-          "additionalProperties": {
-            "type": "string",
-            "maxLength": 16384
-          },
+          "$ref": "#/$defs/Environment",
           "default": {}
         },
         "autostart": { "type": "boolean", "default": false }
       }
     },
-    "tunnel": {
+    "Services": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "$ref": "#/$defs/ServiceSpec" }
+    },
+    "TunnelName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "Hostname": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253
+    },
+    "LoopbackHttpOrigin": {
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^http://(127\\.0\\.0\\.1|\\[::1\\]):[0-9]{1,5}/?$"
+    },
+    "TunnelSpec": {
       "type": "object",
       "additionalProperties": false,
       "required": ["name", "service_url"],
       "properties": {
-        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
-        "hostname": { "type": "string", "minLength": 1, "maxLength": 253 },
-        "service_url": {
-          "type": "string",
-          "maxLength": 2048,
-          "pattern": "^http://(127\\.0\\.0\\.1|\\[::1\\]):[0-9]{1,5}/?$"
-        },
+        "name": { "$ref": "#/$defs/TunnelName" },
+        "hostname": { "$ref": "#/$defs/Hostname" },
+        "service_url": { "$ref": "#/$defs/LoopbackHttpOrigin" },
         "autostart": { "type": "boolean", "default": false }
       }
     },
-    "update": {
+    "UpdateSpec": {
       "type": "object",
       "additionalProperties": false,
       "required": ["command"],
       "properties": {
-        "command": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 4096
-        },
+        "command": { "$ref": "#/$defs/CommandText" },
         "args": {
-          "type": "array",
-          "maxItems": 128,
-          "items": { "type": "string", "maxLength": 8192 },
+          "$ref": "#/$defs/Arguments",
           "default": []
         }
+      }
+    },
+    "DesktopManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "services"],
+      "properties": {
+        "version": { "type": "integer", "const": 1 },
+        "services": { "$ref": "#/$defs/Services" },
+        "tunnel": { "$ref": "#/$defs/TunnelSpec" },
+        "update": { "$ref": "#/$defs/UpdateSpec" }
       }
     }
   }
