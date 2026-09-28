@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://indiebuild.dev/schemas/scintilla-job-v1.schema.json",
+  "title": "IndieBuild Scintilla ephemeral job",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "api_version",
+    "execution_id",
+    "execution_provider",
+    "ephemeral",
+    "reuse_workspace",
+    "network_mode",
+    "repository",
+    "git_ref",
+    "workflow",
+    "job",
+    "timeout_secs",
+    "execution_os"
+  ],
+  "properties": {
+    "kind": { "const": "gha_indie_worker_job" },
+    "api_version": { "const": "indiebuild.scintilla/v1" },
+    "execution_id": { "type": "string", "pattern": "^giw-[a-f0-9]{32}$" },
+    "execution_provider": { "const": "indiebuild" },
+    "ephemeral": { "const": true },
+    "reuse_workspace": { "const": false },
+    "network_mode": { "const": "restricted" },
+    "repository": { "type": "string", "minLength": 3, "maxLength": 256 },
+    "git_ref": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "workflow": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "job": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "labels": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+    },
+    "timeout_secs": { "type": "integer", "minimum": 1, "maximum": 21600 },
+    "execution_os": { "enum": ["linux", "macos", "windows"] }
+  }
+}

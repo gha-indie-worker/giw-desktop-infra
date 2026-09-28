@@ -6,12 +6,15 @@ token_file = "~/.indiebuild/daemon/token"
 
 [execution]
 backend = "scintilla_desktop_daemon"
-scintilla_url = "http://127.0.0.1:8750"
+scintilla_url = "http://127.0.0.1:8765"
 scintilla_token_file = "~/.scintilla/daemon/token"
+ephemeral_per_job = true
+reuse_workspace = false
+max_parallel_jobs = 4
 
 [cloudflare]
 enabled = false
-command = "cloudflared"
+managed_by = "scintilla"
 hostname = ""
 
 [power]
@@ -20,8 +23,10 @@ keep_awake = false
 [runner]
 workspace_root = "~/.indiebuild/workspaces"
 max_parallel_jobs = 4
+default_timeout_secs = 3600
+max_timeout_secs = 21600
 
 # GIW owns workflow/job intent and GitHub-compatible execution semantics.
 # It does not duplicate Scintilla worker lifecycle/isolation. Local jobs are
-# submitted to the Scintilla desktop daemon, which remains the worker runtime
-# and machine-level process owner for those workloads.
+# projected as typed ephemeral jobs to the Scintilla desktop daemon, which
+# remains the machine-level process/container authority.

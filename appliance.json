@@ -1,0 +1,43 @@
+{
+  "schema": "giw.desktop-appliance/v1",
+  "channel": "candidate",
+  "substrate": {
+    "repo": "scintilla-run/scintilla-desktop-infra",
+    "rev": "f8d1494ce6444d373db9286a59b6796e09524257",
+    "protocol": "scintilla.local-control/v1",
+    "daemon_url": "http://127.0.0.1:8765"
+  },
+  "components": [
+    {
+      "name": "desktop-daemon",
+      "repo": "gha-indie-worker/giw-desktop-daemon",
+      "rev": "26fe0e8e4078e69c8ae6f045d7d0a91ea9bf77dd",
+      "kind": "rust-binary"
+    },
+    {
+      "name": "desktop-infra",
+      "repo": "gha-indie-worker/giw-desktop-infra",
+      "rev": null,
+      "kind": "desired-state"
+    }
+  ],
+  "invariants": {
+    "scintilla_owns_machine_lifecycle": true,
+    "typed_job_intent_only": true,
+    "ephemeral_per_job": true,
+    "workspace_reuse": false,
+    "control_apis_loopback_only": true,
+    "arbitrary_remote_shell": false,
+    "public_ip_required": false,
+    "cloudflare_control_api_exposure": false
+  },
+  "promotion_gates": {
+    "daemon_ci_green": false,
+    "desktop_contract_green": false,
+    "scintilla_substrate_green": false,
+    "common_layer_green": true,
+    "linux_ephemeral_runner_e2e_green": false,
+    "macos_native_runner_e2e_green": false,
+    "windows_native_runner_e2e_green": false
+  }
+}
