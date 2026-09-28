@@ -65,11 +65,12 @@ fn run() -> Result<(), String> {
 
     let compose = fs::read_to_string(root.join(".ores-compose.yaml"))
         .map_err(|error| format!("read .ores-compose.yaml: {error}"))?;
-    for required in [
-        &format!("commit: {daemon_revision}"),
-        "GIW_DESKTOP_ADDR: \"127.0.0.1:8770\"",
-        "GIW_SCINTILLA_DAEMON_URL: \"http://127.0.0.1:8765\"",
-    ] {
+    let required_contracts = [
+        format!("commit: {daemon_revision}"),
+        "GIW_DESKTOP_ADDR: \"127.0.0.1:8770\"".to_owned(),
+        "GIW_SCINTILLA_DAEMON_URL: \"http://127.0.0.1:8765\"".to_owned(),
+    ];
+    for required in &required_contracts {
         if !compose.contains(required) {
             return Err(format!("compose missing required contract: {required}"));
         }
