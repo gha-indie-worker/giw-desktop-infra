@@ -20,23 +20,72 @@
     "execution_os"
   ],
   "properties": {
-    "kind": { "const": "gha_indie_worker_job" },
-    "api_version": { "const": "indiebuild.scintilla/v1" },
-    "execution_id": { "type": "string", "pattern": "^giw-[a-f0-9]{32}$" },
-    "execution_provider": { "const": "indiebuild" },
-    "ephemeral": { "const": true },
-    "reuse_workspace": { "const": false },
-    "network_mode": { "const": "restricted" },
-    "repository": { "type": "string", "minLength": 3, "maxLength": 256 },
-    "git_ref": { "type": "string", "minLength": 1, "maxLength": 256 },
-    "workflow": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "job": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "kind": {
+      "const": "gha_indie_worker_job"
+    },
+    "api_version": {
+      "const": "indiebuild.scintilla/v1"
+    },
+    "execution_id": {
+      "type": "string",
+      "pattern": "^giw-[a-f0-9]{32}$"
+    },
+    "execution_provider": {
+      "const": "indiebuild"
+    },
+    "ephemeral": {
+      "const": true
+    },
+    "reuse_workspace": {
+      "const": false
+    },
+    "network_mode": {
+      "const": "restricted"
+    },
+    "repository": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 256,
+      "pattern": "^(?!.*\\.\\.)[A-Za-z0-9._-]{1,100}/[A-Za-z0-9._-]{1,100}$"
+    },
+    "git_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^(?![-/])(?!.*(?:\\.\\.|//|@\\{|[~^:?*\\[\\\\\\s]))(?!.*(?:/|\\.|\\.lock)$).{1,256}$"
+    },
+    "workflow": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^(?!/)(?!.*\\.\\.)(?!.*\\\\)(?!.*\\s).+$"
+    },
+    "job": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
     "labels": {
       "type": "array",
       "maxItems": 32,
-      "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[A-Za-z0-9._:-]+$"
+      }
     },
-    "timeout_secs": { "type": "integer", "minimum": 1, "maximum": 21600 },
-    "execution_os": { "enum": ["linux", "macos", "windows"] }
+    "timeout_secs": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 21600
+    },
+    "execution_os": {
+      "enum": [
+        "linux",
+        "macos",
+        "windows"
+      ]
+    }
   }
 }
