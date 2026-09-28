@@ -1,0 +1,7 @@
+node_modules/
+artifacts/
+.typespec-json-schema-validator/
+**/target/
+.ores/
+.scratch/
+.tmp/
