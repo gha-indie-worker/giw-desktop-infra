@@ -1,0 +1,13 @@
+[package]
+name = "giw-desktop-tool"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.90"
+publish = false
+
+[lints.rust]
+unsafe_code = "deny"
+
+[dependencies]
+serde_json = "1"
+toml = "0.9"
