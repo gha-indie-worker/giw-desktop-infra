@@ -1,5 +1,9 @@
 use serde_json::Value;
-use std::{\n    fs,\n    path::{Path, PathBuf},\n    process::ExitCode,\n};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::ExitCode,
+};
 
 fn main() -> ExitCode {
     match run() {
