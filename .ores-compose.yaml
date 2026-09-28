@@ -3,7 +3,7 @@ project: gha-indie-worker-desktop
 allow_lazy_start: false
 source:
   repository: https://github.com/gha-indie-worker/giw-desktop-daemon.git
-  commit: 26fe0e8e4078e69c8ae6f045d7d0a91ea9bf77dd
+  commit: e9f51d021a8b0051556fd5dd0cab70c2ac179667
   checkout_dir: tmp/dev/giw-desktop-daemon
 services:
   daemon:
