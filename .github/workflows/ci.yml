@@ -11,12 +11,12 @@ permissions:
   contents: read
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  validate-rust:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
     steps:
       - name: Check out exact revision
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install stable Rust components
@@ -34,3 +34,44 @@ jobs:
       - name: Validate checked-in desired state
         working-directory: tools/validator
         run: cargo +stable run -- ../../.giw-desktop.yaml ../../schema/giw-desktop.schema.json
+
+  contract-parity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up exact Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.23.1"
+          package-manager-cache: false
+      - name: Generate candidate dependency lock when missing
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f package-lock.json ]]; then
+            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          fi
+          test -s package-lock.json
+      - name: Publish dependency lock candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: giw-desktop-infra-package-lock
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Install pinned contract toolchain
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Inventory TypeSpec authority
+        run: npm run contracts:inventory
+      - name: Execute TypeSpec and JSON Schema parity
+        run: npm run contracts:check
+      - name: Require committed reproducibility lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files --error-unmatch package-lock.json
+          git diff --exit-code -- package-lock.json package.json contracts schema
