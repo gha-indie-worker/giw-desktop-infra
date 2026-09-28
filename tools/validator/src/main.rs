@@ -97,6 +97,9 @@ fn validate_semantics(value: &Value) -> Result<()> {
         }
         if let Some(env) = service.get("env").and_then(Value::as_object) {
             for key in env.keys() {
+                if !valid_env_name(key) {
+                    bail!("services[{index}].env has invalid environment name {key:?}");
+                }
                 if looks_secret_bearing(key) {
                     bail!(
                         "services[{index}].env.{key} looks secret-bearing; list the variable name under env_passthrough or use the encrypted secret boundary instead of a literal value"
@@ -115,6 +118,17 @@ fn validate_semantics(value: &Value) -> Result<()> {
     }
 
     return Ok(());
+}
+
+fn valid_env_name(value: &str) -> bool {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if first != '_' && !first.is_ascii_uppercase() {
+        return false;
+    }
+    return chars.all(|character| character == '_' || character.is_ascii_uppercase() || character.is_ascii_digit());
 }
 
 fn looks_secret_bearing(key: &str) -> bool {
@@ -209,11 +223,20 @@ mod tests {
     }
 
     #[test]
-    fn secret_literal_is_rejected_by_schema_and_semantics() {
+    fn secret_literal_is_shape_valid_but_policy_rejected() {
         let schema = authored_schema();
         let mut manifest = valid_manifest();
         manifest["services"][0]["env"] = json!({"API_TOKEN": "synthetic-canary"});
-        assert!(validate_against_schema(&schema, &manifest).is_err());
+        assert!(validate_against_schema(&schema, &manifest).is_ok());
+        assert!(validate_semantics(&manifest).is_err());
+    }
+
+    #[test]
+    fn malformed_literal_env_name_is_shape_valid_but_policy_rejected() {
+        let schema = authored_schema();
+        let mut manifest = valid_manifest();
+        manifest["services"][0]["env"] = json!({"lowercase_key": "value"});
+        assert!(validate_against_schema(&schema, &manifest).is_ok());
         assert!(validate_semantics(&manifest).is_err());
     }
 
