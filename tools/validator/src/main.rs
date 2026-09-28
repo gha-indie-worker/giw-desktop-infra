@@ -128,7 +128,9 @@ fn valid_env_name(value: &str) -> bool {
     if first != '_' && !first.is_ascii_uppercase() {
         return false;
     }
-    return chars.all(|character| character == '_' || character.is_ascii_uppercase() || character.is_ascii_digit());
+    return chars.all(|character| {
+        character == '_' || character.is_ascii_uppercase() || character.is_ascii_digit()
+    });
 }
 
 fn looks_secret_bearing(key: &str) -> bool {
