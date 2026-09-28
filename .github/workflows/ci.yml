@@ -63,8 +63,16 @@ jobs:
           path: package-lock.json
           if-no-files-found: error
           retention-days: 14
-      - name: Install pinned contract toolchain
+      - name: Install pinned contract graph without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build only the reviewed flags2env native binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./node_modules/@oresoftware/f2e/package.json').version")" = "0.3.0"
+          test -f node_modules/@oresoftware/f2e/clients/nodejs/binding.gyp
+          npm rebuild @oresoftware/f2e --foreground-scripts --no-audit --no-fund
+          test -f node_modules/@oresoftware/f2e/clients/nodejs/build/Release/flags2env.node
       - name: Inventory TypeSpec authority
         run: npm run contracts:inventory
       - name: Execute TypeSpec and JSON Schema parity
