@@ -9,7 +9,7 @@ services:
   daemon:
     runtime: host
     build:
-      - ["cargo", "build", "--release", "--locked"]
+      - ["cargo", "build", "--release"]
     command: ["./target/release/giw-desktop-daemon"]
     inherit_env:
       - GIW_DESKTOP_TOKEN_FILE
