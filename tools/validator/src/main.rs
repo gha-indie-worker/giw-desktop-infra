@@ -5,7 +5,6 @@ use std::{collections::HashSet, env, fs, path::Path};
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
 
-const AUTHORED_SCHEMA: &str = include_str!("../../../schema/giw-desktop.schema.json");
 const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
 
 fn main() -> Result<()> {
@@ -135,13 +134,14 @@ fn looks_secret_bearing(key: &str) -> bool {
 }
 
 fn validate_literal_loopback_origin(value: &str) -> Result<()> {
-    let authority = value
+    let without_scheme = value
         .strip_prefix("http://")
-        .context("tunnel.service_url must use http://")?
-        .strip_suffix('/')
-        .unwrap_or_else(|| value.strip_prefix("http://").expect("prefix checked"));
+        .context("tunnel.service_url must use http://")?;
+    let authority = without_scheme.strip_suffix('/').unwrap_or(without_scheme);
     if authority.contains(['/', '?', '#', '@']) {
-        bail!("tunnel.service_url must be a literal loopback origin without credentials, path, query, or fragment");
+        bail!(
+            "tunnel.service_url must be a literal loopback origin without credentials, path, query, or fragment"
+        );
     }
 
     let port = if let Some(port) = authority.strip_prefix("127.0.0.1:") {
@@ -166,7 +166,8 @@ mod tests {
     use serde_json::json;
 
     fn authored_schema() -> Value {
-        return serde_json::from_str(AUTHORED_SCHEMA).expect("authored schema JSON");
+        return serde_json::from_str(include_str!("../../../schema/giw-desktop.schema.json"))
+            .expect("authored schema JSON");
     }
 
     fn valid_manifest() -> Value {
@@ -228,7 +229,10 @@ mod tests {
         ] {
             let mut manifest = valid_manifest();
             manifest["tunnel"]["service_url"] = Value::String(candidate.to_string());
-            assert!(validate_against_schema(&schema, &manifest).is_err(), "{candidate}");
+            assert!(
+                validate_against_schema(&schema, &manifest).is_err(),
+                "{candidate}"
+            );
             assert!(validate_semantics(&manifest).is_err(), "{candidate}");
         }
     }
