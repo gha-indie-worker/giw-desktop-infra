@@ -11,7 +11,7 @@
     {
       "name": "desktop-daemon",
       "repo": "gha-indie-worker/giw-desktop-daemon",
-      "rev": "26fe0e8e4078e69c8ae6f045d7d0a91ea9bf77dd",
+      "rev": "e9f51d021a8b0051556fd5dd0cab70c2ac179667",
       "kind": "rust-binary"
     },
     {
@@ -32,8 +32,8 @@
     "cloudflare_control_api_exposure": false
   },
   "promotion_gates": {
-    "daemon_ci_green": false,
-    "desktop_contract_green": false,
+    "daemon_ci_green": true,
+    "desktop_contract_green": true,
     "scintilla_substrate_green": false,
     "common_layer_green": true,
     "linux_ephemeral_runner_e2e_green": false,
