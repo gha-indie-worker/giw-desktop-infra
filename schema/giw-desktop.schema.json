@@ -9,6 +9,7 @@
     "version": { "const": 1 },
     "services": {
       "type": "array",
+      "maxItems": 64,
       "items": { "$ref": "#/$defs/service" }
     },
     "tunnel": { "$ref": "#/$defs/tunnel" },
@@ -23,24 +24,53 @@
         "name": {
           "type": "string",
           "minLength": 1,
+          "maxLength": 256,
           "pattern": "^[a-z0-9][a-z0-9._-]*$"
         },
-        "command": { "type": "string", "minLength": 1 },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
         "args": {
           "type": "array",
-          "items": { "type": "string" },
+          "maxItems": 128,
+          "items": { "type": "string", "maxLength": 8192 },
           "default": []
         },
-        "working_dir": { "type": "string", "minLength": 1 },
+        "working_dir": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
         "env_passthrough": {
           "type": "array",
+          "maxItems": 128,
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" },
+          "items": {
+            "type": "string",
+            "maxLength": 256,
+            "pattern": "^[A-Z_][A-Z0-9_]*$"
+          },
           "default": []
         },
         "env": {
           "type": "object",
-          "additionalProperties": { "type": "string" },
+          "maxProperties": 128,
+          "propertyNames": {
+            "allOf": [
+              { "pattern": "^[A-Z_][A-Z0-9_]*$" },
+              {
+                "not": {
+                  "pattern": "(TOKEN|SECRET|PASSWORD|PRIVATE|CREDENTIAL|API_KEY|DATABASE_URL|GH_PAT)"
+                }
+              }
+            ]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 16384
+          },
           "default": {}
         },
         "autostart": { "type": "boolean", "default": false }
@@ -51,11 +81,12 @@
       "additionalProperties": false,
       "required": ["name", "service_url"],
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "hostname": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "hostname": { "type": "string", "minLength": 1, "maxLength": 253 },
         "service_url": {
           "type": "string",
-          "pattern": "^http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(:[0-9]{1,5})?(/.*)?$"
+          "maxLength": 2048,
+          "pattern": "^http://(127\\.0\\.0\\.1|\\[::1\\]):[0-9]{1,5}/?$"
         },
         "autostart": { "type": "boolean", "default": false }
       }
@@ -65,10 +96,15 @@
       "additionalProperties": false,
       "required": ["command"],
       "properties": {
-        "command": { "type": "string", "minLength": 1 },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
         "args": {
           "type": "array",
-          "items": { "type": "string" },
+          "maxItems": 128,
+          "items": { "type": "string", "maxLength": 8192 },
           "default": []
         }
       }

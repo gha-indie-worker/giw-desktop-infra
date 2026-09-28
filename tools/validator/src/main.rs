@@ -3,7 +3,10 @@
 use std::{collections::HashSet, env, fs, path::Path};
 
 use anyhow::{Context, Result, bail};
-use serde_json::{Map, Value};
+use serde_json::Value;
+
+const AUTHORED_SCHEMA: &str = include_str!("../../../schema/giw-desktop.schema.json");
+const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
 
 fn main() -> Result<()> {
     let mut args = env::args().skip(1);
@@ -18,33 +21,36 @@ fn main() -> Result<()> {
         bail!("usage: giw-desktop-infra-validator [manifest.yaml] [schema.json]");
     }
 
-    validate_schema_document(Path::new(&schema_path))?;
+    let schema = load_and_validate_schema(Path::new(&schema_path))?;
     let manifest = load_yaml_as_json(Path::new(&manifest_path))?;
-    validate_manifest(&manifest)?;
+    validate_against_schema(&schema, &manifest)?;
+    validate_semantics(&manifest)?;
 
     println!("GIW desktop infra validation passed: {manifest_path}");
     return Ok(());
 }
 
-fn validate_schema_document(path: &Path) -> Result<()> {
+fn load_and_validate_schema(path: &Path) -> Result<Value> {
     let raw = fs::read_to_string(path)
         .with_context(|| format!("failed to read JSON Schema at {}", path.display()))?;
     let schema: Value = serde_json::from_str(&raw)
         .with_context(|| format!("invalid JSON Schema JSON at {}", path.display()))?;
-    let object = schema
-        .as_object()
-        .context("desktop JSON Schema root must be an object")?;
-
-    if object.get("$schema").and_then(Value::as_str)
+    if schema.get("$schema").and_then(Value::as_str)
         != Some("https://json-schema.org/draft/2020-12/schema")
     {
         bail!("desktop schema must declare JSON Schema Draft 2020-12");
     }
-
-    return Ok(());
+    jsonschema::meta::validate(&schema)
+        .map_err(|error| anyhow::anyhow!("desktop authored JSON Schema is invalid: {error}"))?;
+    return Ok(schema);
 }
 
 fn load_yaml_as_json(path: &Path) -> Result<Value> {
+    let metadata = fs::metadata(path)
+        .with_context(|| format!("failed to stat desktop manifest at {}", path.display()))?;
+    if metadata.len() > MAX_MANIFEST_BYTES {
+        bail!("desktop manifest exceeds 1 MiB: {}", path.display());
+    }
     let raw = fs::read_to_string(path)
         .with_context(|| format!("failed to read desktop manifest at {}", path.display()))?;
     let yaml: serde_yaml::Value = serde_yaml::from_str(&raw)
@@ -52,224 +58,64 @@ fn load_yaml_as_json(path: &Path) -> Result<Value> {
     return serde_json::to_value(yaml).context("failed to normalize manifest to JSON value");
 }
 
-fn validate_manifest(value: &Value) -> Result<()> {
+fn validate_against_schema(schema: &Value, manifest: &Value) -> Result<()> {
+    let validator = jsonschema::validator_for(schema)
+        .map_err(|error| anyhow::anyhow!("failed to compile authored JSON Schema: {error}"))?;
+    let errors = validator
+        .iter_errors(manifest)
+        .take(20)
+        .map(|error| format!("{} at {}", error, error.instance_path()))
+        .collect::<Vec<_>>();
+    if !errors.is_empty() {
+        bail!(
+            "desktop manifest failed authored JSON Schema validation:\n- {}",
+            errors.join("\n- ")
+        );
+    }
+    return Ok(());
+}
+
+fn validate_semantics(value: &Value) -> Result<()> {
     let root = value
         .as_object()
-        .context("desktop manifest root must be an object")?;
-
-    reject_unknown_keys(
-        root,
-        &["version", "services", "tunnel", "update"],
-        "manifest",
-    )?;
-
-    if root.get("version").and_then(Value::as_u64) != Some(1) {
-        bail!("desktop manifest version must be exactly 1");
-    }
-
+        .context("desktop manifest root must be an object after schema validation")?;
     let services = root
         .get("services")
         .and_then(Value::as_array)
-        .context("desktop manifest services must be an array")?;
+        .context("desktop manifest services must be an array after schema validation")?;
     let mut names = HashSet::new();
 
     for (index, service) in services.iter().enumerate() {
-        validate_service(service, index, &mut names)?;
-    }
-
-    if let Some(tunnel) = root.get("tunnel") {
-        validate_tunnel(tunnel)?;
-    }
-
-    if let Some(update) = root.get("update") {
-        validate_update(update)?;
-    }
-
-    return Ok(());
-}
-
-fn validate_service(value: &Value, index: usize, names: &mut HashSet<String>) -> Result<()> {
-    let service = value
-        .as_object()
-        .with_context(|| format!("services[{index}] must be an object"))?;
-    reject_unknown_keys(
-        service,
-        &[
-            "name",
-            "command",
-            "args",
-            "working_dir",
-            "env_passthrough",
-            "env",
-            "autostart",
-        ],
-        &format!("services[{index}]"),
-    )?;
-
-    let name = required_nonempty_string(service, "name", &format!("services[{index}]"))?;
-    if !is_service_name(name) {
-        bail!("services[{index}].name contains unsupported characters: {name:?}");
-    }
-    if !names.insert(name.to_string()) {
-        bail!("duplicate desktop service name {name:?}");
-    }
-
-    let _ = required_nonempty_string(service, "command", &format!("services[{index}]"))?;
-
-    if let Some(args) = service.get("args") {
-        validate_string_array(args, &format!("services[{index}].args"), false)?;
-    }
-
-    if let Some(working_dir) = service.get("working_dir") {
-        if working_dir.as_str().is_none_or(str::is_empty) {
-            bail!("services[{index}].working_dir must be a non-empty string");
-        }
-    }
-
-    if let Some(passthrough) = service.get("env_passthrough") {
-        validate_string_array(
-            passthrough,
-            &format!("services[{index}].env_passthrough"),
-            true,
-        )?;
-        for key in passthrough.as_array().expect("validated as array") {
-            let key = key.as_str().expect("validated as string");
-            if !is_env_name(key) {
-                bail!("services[{index}].env_passthrough has invalid env name {key:?}");
-            }
-        }
-    }
-
-    if let Some(env) = service.get("env") {
-        let env = env
+        let service = service
             .as_object()
-            .with_context(|| format!("services[{index}].env must be an object"))?;
-        for (key, literal_value) in env {
-            if !is_env_name(key) {
-                bail!("services[{index}].env has invalid env name {key:?}");
-            }
-            if literal_value.as_str().is_none() {
-                bail!("services[{index}].env.{key} must be a string");
-            }
-            if looks_secret_bearing(key) {
-                bail!(
-                    "services[{index}].env.{key} looks secret-bearing; list the variable name under env_passthrough or use the encrypted secret boundary instead of a literal value"
-                );
+            .with_context(|| format!("services[{index}] must be an object"))?;
+        let name = service
+            .get("name")
+            .and_then(Value::as_str)
+            .with_context(|| format!("services[{index}].name missing after schema validation"))?;
+        if !names.insert(name) {
+            bail!("duplicate desktop service name {name:?}");
+        }
+        if let Some(env) = service.get("env").and_then(Value::as_object) {
+            for key in env.keys() {
+                if looks_secret_bearing(key) {
+                    bail!(
+                        "services[{index}].env.{key} looks secret-bearing; list the variable name under env_passthrough or use the encrypted secret boundary instead of a literal value"
+                    );
+                }
             }
         }
     }
 
-    if let Some(autostart) = service.get("autostart")
-        && !autostart.is_boolean()
-    {
-        bail!("services[{index}].autostart must be boolean");
+    if let Some(tunnel) = root.get("tunnel").and_then(Value::as_object) {
+        let service_url = tunnel
+            .get("service_url")
+            .and_then(Value::as_str)
+            .context("tunnel.service_url missing after schema validation")?;
+        validate_literal_loopback_origin(service_url)?;
     }
 
     return Ok(());
-}
-
-fn validate_tunnel(value: &Value) -> Result<()> {
-    let tunnel = value.as_object().context("tunnel must be an object")?;
-    reject_unknown_keys(
-        tunnel,
-        &["name", "hostname", "service_url", "autostart"],
-        "tunnel",
-    )?;
-
-    let _ = required_nonempty_string(tunnel, "name", "tunnel")?;
-    let service_url = required_nonempty_string(tunnel, "service_url", "tunnel")?;
-    if !is_loopback_http_url(service_url) {
-        bail!("tunnel.service_url must be loopback HTTP; got {service_url:?}");
-    }
-
-    if let Some(hostname) = tunnel.get("hostname")
-        && hostname.as_str().is_none_or(str::is_empty)
-    {
-        bail!("tunnel.hostname must be a non-empty string when present");
-    }
-
-    if let Some(autostart) = tunnel.get("autostart")
-        && !autostart.is_boolean()
-    {
-        bail!("tunnel.autostart must be boolean");
-    }
-
-    return Ok(());
-}
-
-fn validate_update(value: &Value) -> Result<()> {
-    let update = value.as_object().context("update must be an object")?;
-    reject_unknown_keys(update, &["command", "args"], "update")?;
-    let _ = required_nonempty_string(update, "command", "update")?;
-    if let Some(args) = update.get("args") {
-        validate_string_array(args, "update.args", false)?;
-    }
-    return Ok(());
-}
-
-fn reject_unknown_keys(object: &Map<String, Value>, allowed: &[&str], context: &str) -> Result<()> {
-    for key in object.keys() {
-        if !allowed.contains(&key.as_str()) {
-            bail!("{context} contains unknown key {key:?}");
-        }
-    }
-    return Ok(());
-}
-
-fn required_nonempty_string<'a>(
-    object: &'a Map<String, Value>,
-    key: &str,
-    context: &str,
-) -> Result<&'a str> {
-    let value = object
-        .get(key)
-        .and_then(Value::as_str)
-        .with_context(|| format!("{context}.{key} must be a string"))?;
-    if value.is_empty() {
-        bail!("{context}.{key} may not be empty");
-    }
-    return Ok(value);
-}
-
-fn validate_string_array(value: &Value, context: &str, unique: bool) -> Result<()> {
-    let values = value
-        .as_array()
-        .with_context(|| format!("{context} must be an array"))?;
-    let mut seen = HashSet::new();
-
-    for entry in values {
-        let entry = entry
-            .as_str()
-            .with_context(|| format!("{context} entries must be strings"))?;
-        if unique && !seen.insert(entry) {
-            bail!("{context} contains duplicate entry {entry:?}");
-        }
-    }
-
-    return Ok(());
-}
-
-fn is_service_name(value: &str) -> bool {
-    let mut chars = value.chars();
-    let Some(first) = chars.next() else {
-        return false;
-    };
-    if !first.is_ascii_lowercase() && !first.is_ascii_digit() {
-        return false;
-    }
-    return chars
-        .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || matches!(ch, '.' | '_' | '-'));
-}
-
-fn is_env_name(value: &str) -> bool {
-    let mut chars = value.chars();
-    let Some(first) = chars.next() else {
-        return false;
-    };
-    if first != '_' && !first.is_ascii_uppercase() {
-        return false;
-    }
-    return chars.all(|ch| ch == '_' || ch.is_ascii_uppercase() || ch.is_ascii_digit());
 }
 
 fn looks_secret_bearing(key: &str) -> bool {
@@ -288,42 +134,111 @@ fn looks_secret_bearing(key: &str) -> bool {
     .any(|marker| upper.contains(marker));
 }
 
-fn is_loopback_http_url(value: &str) -> bool {
-    let Some(rest) = value.strip_prefix("http://") else {
-        return false;
+fn validate_literal_loopback_origin(value: &str) -> Result<()> {
+    let authority = value
+        .strip_prefix("http://")
+        .context("tunnel.service_url must use http://")?
+        .strip_suffix('/')
+        .unwrap_or_else(|| value.strip_prefix("http://").expect("prefix checked"));
+    if authority.contains(['/', '?', '#', '@']) {
+        bail!("tunnel.service_url must be a literal loopback origin without credentials, path, query, or fragment");
+    }
+
+    let port = if let Some(port) = authority.strip_prefix("127.0.0.1:") {
+        port
+    } else if let Some(port) = authority.strip_prefix("[::1]:") {
+        port
+    } else {
+        bail!("tunnel.service_url host must be literal 127.0.0.1 or ::1");
     };
-    let authority = rest.split('/').next().unwrap_or_default();
-    return authority == "localhost"
-        || authority.starts_with("localhost:")
-        || authority == "127.0.0.1"
-        || authority.starts_with("127.0.0.1:")
-        || authority == "[::1]"
-        || authority.starts_with("[::1]:");
+    let port: u16 = port
+        .parse()
+        .with_context(|| "tunnel.service_url must contain an explicit valid TCP port")?;
+    if port == 0 {
+        bail!("tunnel.service_url port 0 is not allowed");
+    }
+    return Ok(());
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
-    #[test]
-    fn secret_literal_names_are_rejected() {
-        assert!(looks_secret_bearing("SERVER_AUTH_SECRET"));
-        assert!(looks_secret_bearing("DATABASE_URL"));
-        assert!(!looks_secret_bearing("BUILD_SERVER_DEPLOY_ENABLED"));
+    fn authored_schema() -> Value {
+        return serde_json::from_str(AUTHORED_SCHEMA).expect("authored schema JSON");
+    }
+
+    fn valid_manifest() -> Value {
+        return json!({
+            "version": 1,
+            "services": [{
+                "name": "build-server",
+                "command": "dd-build-server",
+                "args": [],
+                "env_passthrough": ["SERVER_AUTH_SECRET"],
+                "env": {"BUILD_SERVER_DEPLOY_ENABLED": "false"},
+                "autostart": false
+            }],
+            "tunnel": {
+                "name": "indiebuild-desktop",
+                "hostname": "device.indiebuild.dev",
+                "service_url": "http://127.0.0.1:8080",
+                "autostart": false
+            }
+        });
     }
 
     #[test]
-    fn tunnel_origin_is_loopback_only() {
-        assert!(is_loopback_http_url("http://127.0.0.1:8080"));
-        assert!(is_loopback_http_url("http://localhost:8080/path"));
-        assert!(!is_loopback_http_url("https://127.0.0.1:8080"));
-        assert!(!is_loopback_http_url("http://indiebuild.dev:8080"));
+    fn authored_schema_is_valid_draft_2020_12() {
+        let schema = authored_schema();
+        assert_eq!(
+            schema.get("$schema").and_then(Value::as_str),
+            Some("https://json-schema.org/draft/2020-12/schema")
+        );
+        assert!(jsonschema::meta::validate(&schema).is_ok());
     }
 
     #[test]
-    fn environment_names_are_strict() {
-        assert!(is_env_name("GIW_DESKTOP_URL"));
-        assert!(is_env_name("_GIW_TEST"));
-        assert!(!is_env_name("giw_desktop_url"));
+    fn checked_in_shape_passes_schema_and_semantics() {
+        let schema = authored_schema();
+        let manifest = valid_manifest();
+        assert!(validate_against_schema(&schema, &manifest).is_ok());
+        assert!(validate_semantics(&manifest).is_ok());
+    }
+
+    #[test]
+    fn secret_literal_is_rejected_by_schema_and_semantics() {
+        let schema = authored_schema();
+        let mut manifest = valid_manifest();
+        manifest["services"][0]["env"] = json!({"API_TOKEN": "synthetic-canary"});
+        assert!(validate_against_schema(&schema, &manifest).is_err());
+        assert!(validate_semantics(&manifest).is_err());
+    }
+
+    #[test]
+    fn ambiguous_loopback_urls_are_rejected() {
+        let schema = authored_schema();
+        for candidate in [
+            "http://localhost:8080",
+            "http://user@127.0.0.1:8080",
+            "http://127.0.0.1:8080/path",
+            "http://127.0.0.1:8080?x=1",
+            "https://127.0.0.1:8080",
+        ] {
+            let mut manifest = valid_manifest();
+            manifest["tunnel"]["service_url"] = Value::String(candidate.to_string());
+            assert!(validate_against_schema(&schema, &manifest).is_err(), "{candidate}");
+            assert!(validate_semantics(&manifest).is_err(), "{candidate}");
+        }
+    }
+
+    #[test]
+    fn semantic_port_check_rejects_out_of_range_port() {
+        let schema = authored_schema();
+        let mut manifest = valid_manifest();
+        manifest["tunnel"]["service_url"] = Value::String("http://127.0.0.1:99999".to_string());
+        assert!(validate_against_schema(&schema, &manifest).is_ok());
+        assert!(validate_semantics(&manifest).is_err());
     }
 }
