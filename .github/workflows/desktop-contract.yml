@@ -8,10 +8,30 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: desktop-contract-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - name: Validate desktop appliance
-        run: python3 scripts/validate.py
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.90.0
+          components: rustfmt, clippy
+      - name: Format
+        working-directory: tools/giw-desktop-tool
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        working-directory: tools/giw-desktop-tool
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Test and validate desktop appliance
+        working-directory: tools/giw-desktop-tool
+        run: |
+          cargo test --all-targets
+          cargo run --quiet
