@@ -21,9 +21,9 @@ fn main() -> ExitCode {
 fn run() -> Result<(), String> {
     let root = repository_root()?;
 
-    let config: toml::Value = fs::read_to_string(root.join(".giw-desktop.toml"))
-        .map_err(|error| format!("read .giw-desktop.toml: {error}"))?
-        .parse()
+    let config_text = fs::read_to_string(root.join(".giw-desktop.toml"))
+        .map_err(|error| format!("read .giw-desktop.toml: {error}"))?;
+    let config: toml::Value = toml::from_str(&config_text)
         .map_err(|error| format!("parse .giw-desktop.toml: {error}"))?;
     require_toml_str(&config, &["daemon", "listen_addr"], "127.0.0.1:8770")?;
     require_toml_str(
