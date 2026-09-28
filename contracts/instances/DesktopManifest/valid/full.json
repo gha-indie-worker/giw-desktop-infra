@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "services": [
+    {
+      "name": "build-server",
+      "command": "dd-build-server",
+      "args": ["--bind", "127.0.0.1:8080"],
+      "working_dir": "/tmp/indiebuild",
+      "env_passthrough": ["SERVER_AUTH_SECRET"],
+      "env": {
+        "BUILD_SERVER_DEPLOY_ENABLED": "false"
+      },
+      "autostart": false
+    }
+  ],
+  "tunnel": {
+    "name": "indiebuild-desktop",
+    "hostname": "device.indiebuild.dev",
+    "service_url": "http://127.0.0.1:8080",
+    "autostart": false
+  },
+  "update": {
+    "command": "giw-update",
+    "args": ["--channel", "stable"]
+  }
+}
