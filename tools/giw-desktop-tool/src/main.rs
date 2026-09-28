@@ -1,5 +1,5 @@
 use serde_json::Value;
-use std::{fs, path::{Path, PathBuf}, process::ExitCode};
+use std::{\n    fs,\n    path::{Path, PathBuf},\n    process::ExitCode,\n};
 
 fn main() -> ExitCode {
     match run() {
@@ -45,18 +45,11 @@ fn run() -> Result<(), String> {
     require_git_sha("common_layer.revision", common_revision)?;
 
     let appliance = read_json(root.join("appliance.json"))?;
-    require_json_str(
-        &appliance,
-        "/substrate/daemon_url",
-        "http://127.0.0.1:8765",
-    )?;
+    require_json_str(&appliance, "/substrate/daemon_url", "http://127.0.0.1:8765")?;
     require_json_bool(&appliance, "/invariants/ephemeral_per_job", true)?;
     require_json_bool(&appliance, "/invariants/workspace_reuse", false)?;
     require_json_bool(&appliance, "/invariants/arbitrary_remote_shell", false)?;
-    require_git_sha(
-        "substrate.rev",
-        json_str(&appliance, "/substrate/rev")?,
-    )?;
+    require_git_sha("substrate.rev", json_str(&appliance, "/substrate/rev")?)?;
     let daemon_revision = appliance
         .pointer("/components/0/rev")
         .and_then(Value::as_str)
@@ -99,8 +92,8 @@ fn repository_root() -> Result<PathBuf, String> {
 }
 
 fn read_json(path: PathBuf) -> Result<Value, String> {
-    let text = fs::read_to_string(&path)
-        .map_err(|error| format!("read {}: {error}", path.display()))?;
+    let text =
+        fs::read_to_string(&path).map_err(|error| format!("read {}: {error}", path.display()))?;
     serde_json::from_str(&text).map_err(|error| format!("parse {}: {error}", path.display()))
 }
 
@@ -161,7 +154,10 @@ fn require_toml_str(value: &toml::Value, path: &[&str], expected: &str) -> Resul
     if actual == expected {
         Ok(())
     } else {
-        Err(format!("{}={actual:?}, expected {expected:?}", path.join(".")))
+        Err(format!(
+            "{}={actual:?}, expected {expected:?}",
+            path.join(".")
+        ))
     }
 }
 
