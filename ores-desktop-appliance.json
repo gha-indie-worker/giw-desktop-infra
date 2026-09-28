@@ -46,7 +46,7 @@
     "daemon_exact_revision": true,
     "common_layer_pinned": true,
     "scintilla_substrate_pinned": true,
-    "daemon_ci_green": false,
+    "daemon_ci_green": true,
     "ephemeral_runner_e2e_green": false
   }
 }
