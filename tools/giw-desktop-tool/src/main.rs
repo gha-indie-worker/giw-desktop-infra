@@ -102,11 +102,7 @@ fn run() -> Result<(), String> {
 
 fn validate_generation_contract(root: &Path) -> Result<(), String> {
     let contract = read_json(root.join("ores-generation-contract.json"))?;
-    require_json_str(
-        &contract,
-        "/schema",
-        "ores.desktop-generation-consumer/v1",
-    )?;
+    require_json_str(&contract, "/schema", "ores.desktop-generation-consumer/v1")?;
     require_json_str(
         &contract,
         "/consumer/repository",
@@ -118,11 +114,7 @@ fn validate_generation_contract(root: &Path) -> Result<(), String> {
         "/authority/repository",
         "ORESoftware/ores-common-desktop-infra",
     )?;
-    require_json_str(
-        &contract,
-        "/authority/revision",
-        GENERATION_AUTHORITY,
-    )?;
+    require_json_str(&contract, "/authority/revision", GENERATION_AUTHORITY)?;
     require_git_sha(
         "authority.revision",
         json_str(&contract, "/authority/revision")?,
@@ -166,11 +158,7 @@ fn validate_generation_contract(root: &Path) -> Result<(), String> {
         "/middleware/beam_code_reload_requires_drain_or_otp_proof",
         true,
     )?;
-    require_json_bool(
-        &contract,
-        "/verification/shared_conformance_required",
-        true,
-    )?;
+    require_json_bool(&contract, "/verification/shared_conformance_required", true)?;
     require_json_bool(&contract, "/verification/product_e2e_required", true)?;
 
     let role_requirements = contract
@@ -184,7 +172,10 @@ fn validate_generation_contract(root: &Path) -> Result<(), String> {
         "scintilla_backed_execution",
         "indiebuild_job_semantics_remain_product_owned",
     ] {
-        if !role_requirements.iter().any(|value| value.as_str() == Some(required)) {
+        if !role_requirements
+            .iter()
+            .any(|value| value.as_str() == Some(required))
+        {
             return Err(format!("missing generation role requirement: {required}"));
         }
     }
