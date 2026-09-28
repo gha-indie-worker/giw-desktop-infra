@@ -1,0 +1,52 @@
+{
+  "schema": "ores.desktop-appliance/v1",
+  "product": "gha-indie-worker",
+  "channel": "candidate",
+  "orchestrator": {
+    "engine": "ores-compose",
+    "config": ".ores-compose.yaml",
+    "source_role": "desktop-daemon",
+    "shutdown_timeout_ms": 5000
+  },
+  "host": {
+    "trust_model": "developer-owned-trusted-host",
+    "daemon_listen": "127.0.0.1:8770",
+    "public_origin": null,
+    "requires_public_ip": false
+  },
+  "cloudflare": {
+    "mode": "substrate-managed-optional",
+    "credentials_in_repo": false,
+    "origin": null,
+    "public_ingress_ready": false,
+    "origin_auth": "outbound-control-by-default",
+    "promotion_reason": "CI runner control is outbound; control-plane loopback APIs must never be tunnel origins."
+  },
+  "update": {
+    "mode": "exact-revision",
+    "allow_mutable_latest": false
+  },
+  "common_layer": {
+    "repository": "ORESoftware/ores-common-desktop-infra",
+    "checkout_dir": "tmp/dev/ores-common-desktop-infra",
+    "status": "pinned",
+    "revision": "1de34a491673cff2ff7fedb6ba36f8b6a10ae5a1",
+    "capabilities": [
+      "consumer-validation",
+      "loopback-policy",
+      "secret-file-policy",
+      "cloudflare-policy",
+      "update-policy",
+      "process-lifecycle",
+      "health-readiness",
+      "structured-logging"
+    ]
+  },
+  "promotion_gates": {
+    "daemon_exact_revision": true,
+    "common_layer_pinned": true,
+    "scintilla_substrate_pinned": true,
+    "daemon_ci_green": false,
+    "ephemeral_runner_e2e_green": false
+  }
+}
