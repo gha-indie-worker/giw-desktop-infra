@@ -1,0 +1,24 @@
+schema_version: ores.compose.v1
+project: gha-indie-worker-desktop
+allow_lazy_start: false
+source:
+  repository: https://github.com/gha-indie-worker/giw-desktop-daemon.git
+  commit: 26fe0e8e4078e69c8ae6f045d7d0a91ea9bf77dd
+  checkout_dir: tmp/dev/giw-desktop-daemon
+services:
+  daemon:
+    runtime: host
+    build:
+      - ["cargo", "build", "--release", "--locked"]
+    command: ["./target/release/giw-desktop-daemon"]
+    inherit_env:
+      - GIW_DESKTOP_TOKEN_FILE
+      - GIW_SCINTILLA_TOKEN_FILE
+    environment:
+      GIW_DESKTOP_ADDR: "127.0.0.1:8770"
+      GIW_SCINTILLA_DAEMON_URL: "http://127.0.0.1:8765"
+    healthcheck:
+      command: ["curl", "--fail", "--silent", "http://127.0.0.1:8770/healthz"]
+      interval_ms: 250
+      timeout_ms: 1000
+      retries: 20
