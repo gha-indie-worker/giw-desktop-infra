@@ -3,7 +3,7 @@
   "channel": "candidate",
   "substrate": {
     "repo": "scintilla-run/scintilla-desktop-infra",
-    "rev": "f8d1494ce6444d373db9286a59b6796e09524257",
+    "rev": "fa9a7f17e1fd66943651e02a57eae67ee7d4dc31",
     "protocol": "scintilla.local-control/v1",
     "daemon_url": "http://127.0.0.1:8765"
   },
@@ -11,7 +11,7 @@
     {
       "name": "desktop-daemon",
       "repo": "gha-indie-worker/giw-desktop-daemon",
-      "rev": "e9f51d021a8b0051556fd5dd0cab70c2ac179667",
+      "rev": "bc06ace7454a6288c8e6d11ecfd8580cedf04e8b",
       "kind": "rust-binary"
     },
     {
