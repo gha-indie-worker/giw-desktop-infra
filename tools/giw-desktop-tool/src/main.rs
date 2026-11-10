@@ -116,11 +116,7 @@ fn validate_cloudflare_policy(config: &toml::Value, appliance: &Value) -> Result
         "/invariants/scintilla_owns_machine_lifecycle",
         true,
     )?;
-    require_json_bool(
-        appliance,
-        "/invariants/control_apis_loopback_only",
-        true,
-    )?;
+    require_json_bool(appliance, "/invariants/control_apis_loopback_only", true)?;
     require_json_bool(
         appliance,
         "/invariants/cloudflare_control_api_exposure",
