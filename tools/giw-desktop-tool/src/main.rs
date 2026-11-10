@@ -72,6 +72,8 @@ fn run() -> Result<(), String> {
         .ok_or_else(|| "components[0].rev is required".to_owned())?;
     require_git_sha("components[0].rev", daemon_revision)?;
 
+    validate_cloudflare_policy(&config, &appliance)?;
+
     let compose = fs::read_to_string(root.join(".ores-compose.yaml"))
         .map_err(|error| format!("read .ores-compose.yaml: {error}"))?;
     let required_contracts = [
@@ -97,6 +99,30 @@ fn run() -> Result<(), String> {
 
     validate_generation_contract(&root)?;
 
+    return Ok(());
+}
+
+// Cloudflare Tunnel is owned by Scintilla, not GIW. This desktop repository
+// deliberately has no authority to activate public ingress. Do not relax these
+// checks without an independently reviewed, live Cloudflare Access / ingress
+// readback gate and negative tests for both loopback control APIs.
+fn validate_cloudflare_policy(config: &toml::Value, appliance: &Value) -> Result<(), String> {
+    require_toml_str(config, &["cloudflare", "managed_by"], "scintilla")?;
+    require_toml_bool(config, &["cloudflare", "enabled"], false)?;
+    require_toml_str(config, &["cloudflare", "hostname"], "")?;
+
+    require_json_bool(
+        appliance,
+        "/invariants/scintilla_owns_machine_lifecycle",
+        true,
+    )?;
+    require_json_bool(appliance, "/invariants/control_apis_loopback_only", true)?;
+    require_json_bool(
+        appliance,
+        "/invariants/cloudflare_control_api_exposure",
+        false,
+    )?;
+    require_json_bool(appliance, "/invariants/public_ip_required", false)?;
     return Ok(());
 }
 
@@ -272,4 +298,74 @@ fn require_toml_bool(value: &toml::Value, path: &[&str], expected: bool) -> Resu
     }
 
     return Err(format!("{}={actual}, expected {expected}", path.join(".")));
+}
+
+#[cfg(test)]
+mod cloudflare_security_tests {
+    use super::*;
+
+    fn fixtures() -> (toml::Value, Value) {
+        let config = toml::from_str(
+            r#"
+[cloudflare]
+enabled = false
+managed_by = "scintilla"
+hostname = ""
+"#,
+        )
+        .expect("parse cloudflare fixture");
+        let appliance = serde_json::json!({
+            "invariants": {
+                "scintilla_owns_machine_lifecycle": true,
+                "control_apis_loopback_only": true,
+                "cloudflare_control_api_exposure": false,
+                "public_ip_required": false
+            }
+        });
+        return (config, appliance);
+    }
+
+    #[test]
+    fn closed_cloudflare_policy_is_accepted() {
+        let (config, appliance) = fixtures();
+        assert!(validate_cloudflare_policy(&config, &appliance).is_ok());
+    }
+
+    #[test]
+    fn enabling_tunnel_without_live_attestation_is_refused() {
+        let (mut config, appliance) = fixtures();
+        config["cloudflare"]["enabled"] = toml::Value::Boolean(true);
+        assert!(validate_cloudflare_policy(&config, &appliance).is_err());
+    }
+
+    #[test]
+    fn moving_tunnel_ownership_to_giw_is_refused() {
+        let (mut config, appliance) = fixtures();
+        config["cloudflare"]["managed_by"] = toml::Value::String("giw".into());
+        assert!(validate_cloudflare_policy(&config, &appliance).is_err());
+    }
+
+    #[test]
+    fn unverified_hostname_is_refused() {
+        let (mut config, appliance) = fixtures();
+        config["cloudflare"]["hostname"] = toml::Value::String("unsafe.example.test".into());
+        assert!(validate_cloudflare_policy(&config, &appliance).is_err());
+    }
+
+    #[test]
+    fn exposing_control_apis_is_refused() {
+        let (config, mut appliance) = fixtures();
+        appliance["invariants"]["cloudflare_control_api_exposure"] = Value::Bool(true);
+        assert!(validate_cloudflare_policy(&config, &appliance).is_err());
+        appliance["invariants"]["cloudflare_control_api_exposure"] = Value::Bool(false);
+        appliance["invariants"]["control_apis_loopback_only"] = Value::Bool(false);
+        assert!(validate_cloudflare_policy(&config, &appliance).is_err());
+    }
+
+    #[test]
+    fn removing_scintilla_lifecycle_authority_is_refused() {
+        let (config, mut appliance) = fixtures();
+        appliance["invariants"]["scintilla_owns_machine_lifecycle"] = Value::Bool(false);
+        assert!(validate_cloudflare_policy(&config, &appliance).is_err());
+    }
 }
