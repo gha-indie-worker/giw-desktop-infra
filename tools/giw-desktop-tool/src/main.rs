@@ -352,8 +352,7 @@ hostname = ""
     #[test]
     fn unverified_hostname_is_refused() {
         let (mut config, appliance) = fixtures();
-        config["cloudflare"]["hostname"] =
-            toml::Value::String("unsafe.example.test".into());
+        config["cloudflare"]["hostname"] = toml::Value::String("unsafe.example.test".into());
         assert!(validate_cloudflare_policy(&config, &appliance).is_err());
     }
 
