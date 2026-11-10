@@ -98,3 +98,39 @@ The job projection schema is `manifests/scintilla-job-v1.schema.json`.
 ## Shared common layer
 
 This repo pins `ORESoftware/ores-common-desktop-infra` in `ores-desktop-appliance.json`. Generic lifecycle/security behavior belongs there; GIW-specific workflow semantics stay here and in the GIW daemon/runtime repositories.
+
+## Cloudflare admission and live runner release gate
+
+`cloudflared` is an essential outbound connector for **approved product-facing
+ingress**, not a substitute for GitHub Actions runner registration. Native
+GitHub self-hosted runners receive work over outbound HTTPS to GitHub and do
+not need a public listener. The Scintilla substrate (not GIW) must supervise
+`cloudflared` and its lifecycle.
+
+The versioned desktop config deliberately has `cloudflare.enabled = false`
+and an empty hostname. The executable desktop contract now enforces those
+settings, `managed_by = "scintilla"`, and the appliance's explicit
+`cloudflare_control_api_exposure = false` and loopback-only invariants. This is
+a **fail-closed staging gate**: it does not prevent independently authorized,
+Scintilla-managed tunnels for a separately reviewed product origin. Do **not**
+set the GIW desktop Cloudflare flag to true just to make a local job run.
+
+Before enabling a GIW-facing Cloudflare route in a future reviewed change,
+record live Cloudflare API readback showing the exact named tunnel, ingress
+hostname/path/method restrictions, Access application and deny policy,
+`cloudflared` version, origin readiness, and a catch-all `404`. A dedicated
+signed GitHub webhook surface may use HMAC instead of interactive Access, but
+must have independently verified edge path/method blocking. The local GIW
+(`127.0.0.1:8770`) and Scintilla (`127.0.0.1:8765`) APIs, tunnel metrics,
+local container sockets, and workspace directories must **never** be a
+Cloudflare public origin. Keep tunnel credentials outside Git, command-line
+arguments, job workspaces, and workflow environment variables; rotate on
+suspected exposure.
+
+Run the contract check with `cargo run` and the six Cloudflare negative
+regressions with `cargo test` inside `tools/giw-desktop-tool`. Neither static
+pass establishes a live tunnel or a real GitHub Actions run. The release
+receipt still needs a physical laptop, a GitHub-native `runs-on: self-hosted`
+workflow with nonzero executed steps, an isolated one-shot runner, correct
+job-run/attempt/report bindings, verified cleanup and a negative Access/HMAC
+matrix. See issue #18 for the end-to-end acceptance gate.
